@@ -45,99 +45,35 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  // Navigation View State: 'login' | 'admin-dashboard' | 'student-dashboard' | 'test-room' | 'test-result'
-  const [currentView, setCurrentView] = useState(() => {
-    const saved = localStorage.getItem('infoyashonand_current_view');
-    if (saved === 'admin-dashboard' || saved === 'student-dashboard' || saved === 'test-room' || saved === 'test-result') {
-      return saved;
-    }
-    return 'login';
-  });
+  // Navigation View State: strictly defaults to 'login' whenever anyone enters or opens the URL
+  const [currentView, setCurrentView] = useState('login');
+  const [currentAdmin, setCurrentAdmin] = useState(null);
+  const [currentStudent, setCurrentStudent] = useState(null);
+  const [activeTest, setActiveTest] = useState(null);
+  const [lastAttempt, setLastAttempt] = useState(null);
 
-  const [currentAdmin, setCurrentAdmin] = useState(() => {
-    const saved = localStorage.getItem('infoyashonand_active_admin');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [currentStudent, setCurrentStudent] = useState(() => {
-    try {
-      const saved = localStorage.getItem('infoyashonand_active_student');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-
-  const [activeTest, setActiveTest] = useState(() => {
-    try {
-      const saved = localStorage.getItem('infoyashonand_active_test');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-
-  const [lastAttempt, setLastAttempt] = useState(() => {
-    try {
-      const saved = localStorage.getItem('infoyashonand_last_attempt');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-
-  // Sync to local storage
+  // Proactively clear any stale persistent admin credentials from localStorage
+  // ensuring the login page is always shown when opening the URL
   useEffect(() => {
-    localStorage.setItem('infoyashonand_current_view', currentView);
-  }, [currentView]);
+    localStorage.removeItem('infoyashonand_active_admin');
+    localStorage.removeItem('infoyashonand_current_view');
+  }, []);
 
+  // Strict Security Enforcement: Admin Panel CANNOT be displayed without verified admin credentials
   useEffect(() => {
-    if (currentAdmin) {
-      localStorage.setItem('infoyashonand_active_admin', JSON.stringify(currentAdmin));
-    } else {
-      localStorage.removeItem('infoyashonand_active_admin');
-    }
-  }, [currentAdmin]);
-
-  useEffect(() => {
-    if (currentStudent) {
-      localStorage.setItem('infoyashonand_active_student', JSON.stringify(currentStudent));
-    } else {
-      localStorage.removeItem('infoyashonand_active_student');
-    }
-  }, [currentStudent]);
-
-  useEffect(() => {
-    if (activeTest) {
-      localStorage.setItem('infoyashonand_active_test', JSON.stringify(activeTest));
-    } else {
-      localStorage.removeItem('infoyashonand_active_test');
-    }
-  }, [activeTest]);
-
-  useEffect(() => {
-    if (lastAttempt) {
-      localStorage.setItem('infoyashonand_last_attempt', JSON.stringify(lastAttempt));
-    } else {
-      localStorage.removeItem('infoyashonand_last_attempt');
-    }
-  }, [lastAttempt]);
-
-  // Safety fallback: prevent blank white screen if state is missing
-  useEffect(() => {
-    if (currentView === 'test-room' && (!activeTest || !currentStudent)) {
-      setCurrentView(currentStudent ? 'student-dashboard' : 'login');
-    }
-    if (currentView === 'test-result' && !lastAttempt) {
-      setCurrentView('login');
-    }
     if (currentView === 'admin-dashboard' && !currentAdmin) {
       setCurrentView('login');
     }
     if (currentView === 'student-dashboard' && !currentStudent) {
       setCurrentView('login');
     }
-  }, [currentView, activeTest, currentStudent, currentAdmin, lastAttempt]);
+    if (currentView === 'test-room' && (!activeTest || !currentStudent)) {
+      setCurrentView('login');
+    }
+    if (currentView === 'test-result' && !lastAttempt) {
+      setCurrentView('login');
+    }
+  }, [currentView, currentAdmin, currentStudent, activeTest, lastAttempt]);
 
   // Auth Handlers
   const handleAdminLoginSuccess = (adminData) => {
