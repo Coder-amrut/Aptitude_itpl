@@ -11,11 +11,38 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = new URL(req.url, 'http://localhost');
-    const match = url.searchParams.get('match') || '';
-    url.searchParams.delete('match');
-    const remainingQuery = url.searchParams.toString();
-    const targetPath = '/' + match + (remainingQuery ? '?' + remainingQuery : '');
+    let subPath = req.url || '';
+
+    // Strip /supabase-api or /api prefix if present in req.url
+    if (subPath.startsWith('/supabase-api/')) subPath = subPath.slice(13);
+    else if (subPath.startsWith('/supabase-api')) subPath = subPath.slice(12);
+    else if (subPath.startsWith('/api/')) subPath = subPath.slice(4);
+    else if (subPath.startsWith('/api')) subPath = subPath.slice(3);
+
+    // If routed to proxy endpoint without path segment, retrieve path from rewrite query
+    if (subPath.startsWith('/proxy') || subPath.startsWith('proxy') || !subPath || subPath === '/') {
+      const p = req.query?.path || req.query?.match || '';
+      const joined = Array.isArray(p) ? p.join('/') : p;
+      subPath = joined ? (joined.startsWith('/') ? joined : '/' + joined) : '';
+      const qIndex = req.url.indexOf('?');
+      if (qIndex !== -1) {
+        subPath += req.url.slice(qIndex);
+      }
+    }
+
+    if (!subPath.startsWith('/')) subPath = '/' + subPath;
+
+    // Strip routing query params (match, path) so PostgREST never parses them as SQL/table filters
+    if (subPath.includes('?')) {
+      const [pathPart, queryPart] = subPath.split('?');
+      const params = new URLSearchParams(queryPart);
+      params.delete('path');
+      params.delete('match');
+      const remaining = params.toString();
+      subPath = pathPart + (remaining ? '?' + remaining : '');
+    }
+
+    const targetPath = subPath;
 
     // Collect request body for POST/PUT/PATCH/DELETE
     let bodyData = null;
