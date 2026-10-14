@@ -301,10 +301,24 @@ export const dbService = {
             testQuery = testQuery.ilike('title', `%${cleanCode}%`);
           }
 
-          const { data: dbMatches, error: matchErr } = await withTimeout(
+          let { data: dbMatches, error: matchErr } = await withTimeout(
             testQuery,
-            2800
+            8000
           );
+
+          // If relation query failed or returned empty, do a direct clean select('*')
+          if ((matchErr || !dbMatches || dbMatches.length === 0) && /^\d+$/.test(cleanCode)) {
+            try {
+              const directRes = await withTimeout(
+                supabase.from('tests').select('*').eq('test_id', parseInt(cleanCode, 10)),
+                5000
+              );
+              if (directRes && directRes.data && directRes.data.length > 0) {
+                dbMatches = directRes.data;
+                matchErr = null;
+              }
+            } catch (dirErr) { }
+          }
 
           if (!matchErr && dbMatches && dbMatches.length > 0) {
             const t = dbMatches[0];
