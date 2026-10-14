@@ -141,29 +141,27 @@ export const dbService = {
             rollNo: existing.roll_no,
             fullName: existing.full_name || cleanName,
             branch: existing.branch || branch || 'Engineering / General',
-            batch: existing.batch || batch || 'Batch 2026'
+            batch: existing.batch || batch || 'Batch 2026',
+            marks: existing.marks ?? null
           };
         } else {
           const newId = toUUID();
-          let insertPayload = {
+          // Send only valid columns that exist in the students table
+          const insertPayload = {
             id: newId,
             roll_no: cleanRoll,
             full_name: cleanName,
-            branch: branch || 'Engineering / General',
-            batch: batch || 'Batch 2026',
-            created_at: new Date().toISOString()
+            password: 'student@2026'
           };
 
-          let { data: inserted, error: insertError } = await supabase
+          const { data: inserted, error: insertError } = await supabase
             .from('students')
             .insert(insertPayload)
             .select()
             .maybeSingle();
 
-          if (insertError && insertError.message && insertError.message.includes('password')) {
-            insertPayload.password = 'student@2026';
-            const retry = await supabase.from('students').insert(insertPayload).select().maybeSingle();
-            inserted = retry.data;
+          if (insertError) {
+            console.warn('Supabase candidate save warning:', insertError);
           }
 
           if (inserted) {
@@ -171,8 +169,9 @@ export const dbService = {
               id: inserted.id,
               rollNo: inserted.roll_no,
               fullName: inserted.full_name,
-              branch: inserted.branch || 'Engineering / General',
-              batch: inserted.batch || 'Batch 2026'
+              branch: branch || 'Engineering / General',
+              batch: batch || 'Batch 2026',
+              marks: inserted.marks ?? null
             };
           } else {
             savedStudent = {
@@ -180,7 +179,8 @@ export const dbService = {
               rollNo: cleanRoll,
               fullName: cleanName,
               branch: branch || 'Engineering / General',
-              batch: batch || 'Batch 2026'
+              batch: batch || 'Batch 2026',
+              marks: null
             };
           }
         }
@@ -1112,6 +1112,41 @@ export const dbService = {
     };
 
     if (supabase) {
+      // Resolve student_id to real database student ID by roll_no
+      try {
+        if (newAttemptPayload.student_roll_no) {
+          const { data: matchedStudent } = await supabase
+            .from('students')
+            .select('id')
+            .ilike('roll_no', String(newAttemptPayload.student_roll_no).trim())
+            .maybeSingle();
+          if (matchedStudent && matchedStudent.id) {
+            newAttemptPayload.student_id = matchedStudent.id;
+          }
+        }
+      } catch (e) { }
+
+      // Resolve test_id to real database test ID
+      try {
+        if (testId) {
+          const { data: matchedTest } = await supabase
+            .from('tests')
+            .select('id')
+            .eq('id', testId)
+            .maybeSingle();
+          if (!matchedTest && attemptData.testId) {
+            const { data: altTest } = await supabase
+              .from('tests')
+              .select('id')
+              .eq('test_id', attemptData.testId)
+              .maybeSingle();
+            if (altTest && altTest.id) {
+              newAttemptPayload.test_id = altTest.id;
+            }
+          }
+        }
+      } catch (e) { }
+
       try {
         const { data, error } = await supabase.from('test_attempts').insert(newAttemptPayload).select().maybeSingle();
         if (!error && data) {
@@ -1143,12 +1178,12 @@ export const dbService = {
 
       // CRUCIAL REQUIREMENT: Save candidate score directly into students table 'marks' column
       try {
-        const studentScore = Number(newAttemptPayload.total_score || 0);
-        if (studentId) {
+        const studentScore = Math.round(Number(newAttemptPayload.total_score || 0));
+        if (newAttemptPayload.student_id) {
           await supabase
             .from('students')
             .update({ marks: studentScore })
-            .eq('id', studentId);
+            .eq('id', newAttemptPayload.student_id);
         }
         if (newAttemptPayload.student_roll_no) {
           await supabase
