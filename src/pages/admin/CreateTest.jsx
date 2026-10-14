@@ -493,14 +493,14 @@ Ans: B`;
               <input
                 type="text"
                 required
-                placeholder="Enter Test ID (e.g. ITPL-TEST-01)"
+                placeholder="Enter Test ID (e.g. 1234)"
                 className="form-control"
                 style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}
                 value={testDetails.testIdCode}
                 onChange={(e) => setTestDetails({ ...testDetails, testIdCode: e.target.value })}
               />
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
-                Admin creates unique Test ID for candidate login
+                Admin creates unique Test ID for candidate login (e.g. 1234)
               </div>
             </div>
 
@@ -512,14 +512,14 @@ Ans: B`;
               <input
                 type="text"
                 required
-                placeholder="Enter Test Password (e.g. Exam@Pass2026)"
+                placeholder="Enter Test Password (e.g. 123)"
                 className="form-control"
                 style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}
                 value={testDetails.testPassword}
                 onChange={(e) => setTestDetails({ ...testDetails, testPassword: e.target.value })}
               />
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
-                Admin creates Examination Password for candidate login
+                Admin creates Examination Password for candidate login (e.g. 123)
               </div>
             </div>
 

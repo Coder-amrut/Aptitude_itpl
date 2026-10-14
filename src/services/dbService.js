@@ -748,23 +748,45 @@ export const dbService = {
   async createTest(testData) {
     const supabase = getSupabaseClient();
     const testId = toUUID(testData.id);
-    const testIdCode = String(testData.testIdCode || testData.test_id || `TEST-${testId.slice(0, 6).toUpperCase()}`).trim();
-    const testPassword = String(testData.testPassword || testData.test_password || 'Exam@Pass2026').trim();
 
-    // Payload strictly matching database schema:
-    // Columns 'test_id' and 'test_password' are saved directly.
-    // 'description' column is omitted since it has been deleted from the database.
+    // Convert test_id and test_password to valid integers matching Supabase's int32 column definition
+    const parseIntegerSafe = (val, fallback = 1001) => {
+      if (typeof val === 'number' && !isNaN(val)) return Math.floor(val);
+      const str = String(val || '').trim();
+      if (/^\d+$/.test(str)) {
+        const num = parseInt(str, 10);
+        if (!isNaN(num) && num > 0 && num <= 2147483647) return num;
+      }
+      const digitsOnly = str.replace(/\D/g, '');
+      if (digitsOnly.length > 0) {
+        const num = parseInt(digitsOnly.slice(0, 9), 10);
+        if (!isNaN(num) && num > 0 && num <= 2147483647) return num;
+      }
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) % 900000;
+      }
+      return 100000 + Math.abs(hash);
+    };
+
+    const rawTestIdCode = String(testData.testIdCode || testData.test_id || '').trim();
+    const rawTestPassword = String(testData.testPassword || testData.test_password || '').trim();
+
+    const intTestId = parseIntegerSafe(rawTestIdCode, Math.floor(1000 + Math.random() * 8999));
+    const intTestPassword = parseIntegerSafe(rawTestPassword, 123);
+
     const newTestPayload = {
       id: testId,
-      title: String(testData.title || '').trim(),
-      category: testData.category || 'Aptitude Assessment',
-      test_id: testIdCode,
-      test_password: testPassword,
+      title: String(testData.title || 'Assessment').trim(),
+      category: testData.category || 'General Aptitude',
+      test_id: intTestId,
+      test_password: intTestPassword,
       duration_minutes: Number(testData.durationMinutes) || 30,
       total_marks: Number(testData.totalMarks) || 20,
       pass_percentage: Number(testData.passPercentage) || 50,
       negative_marking: Number(testData.negativeMarking) || 0,
       max_violations: Number(testData.maxViolations) || 3,
+      shuffle_questions: testData.shuffleQuestions !== false,
       is_active: testData.isActive !== false
     };
 
@@ -772,15 +794,16 @@ export const dbService = {
       id: testId,
       title: newTestPayload.title,
       category: newTestPayload.category,
-      testIdCode,
-      testPassword,
-      test_id: testIdCode,
-      test_password: testPassword,
+      testIdCode: String(intTestId),
+      testPassword: String(intTestPassword),
+      test_id: intTestId,
+      test_password: intTestPassword,
       durationMinutes: newTestPayload.duration_minutes,
       totalMarks: newTestPayload.total_marks,
       passPercentage: newTestPayload.pass_percentage,
       negativeMarking: newTestPayload.negative_marking,
       maxViolations: newTestPayload.max_violations,
+      shuffleQuestions: newTestPayload.shuffle_questions,
       isActive: newTestPayload.is_active,
       createdAt: new Date().toISOString()
     };
@@ -789,31 +812,33 @@ export const dbService = {
       try {
         let { data, error } = await supabase.from('tests').insert(newTestPayload).select().maybeSingle();
 
-        // If schema has test_id_code instead of test_id, retry gracefully
-        if (error && error.message && error.message.includes('test_id') && !error.message.includes('test_id_code')) {
-          const alternatePayload = { ...newTestPayload };
-          delete alternatePayload.test_id;
-          alternatePayload.test_id_code = testIdCode;
-          const retry = await supabase.from('tests').insert(alternatePayload).select().maybeSingle();
+        // If duplicate test_id error, retry with a unique number
+        if (error && error.code === '23505') {
+          newTestPayload.test_id = Math.floor(10000 + Math.random() * 89999);
+          const retry = await supabase.from('tests').insert(newTestPayload).select().maybeSingle();
           data = retry.data;
           error = retry.error;
+        }
+
+        if (error) {
+          console.error('Supabase test insert error:', error);
+          throw new Error(error.message || 'Failed to save test in database.');
         }
 
         if (data) {
           savedTest = {
             ...savedTest,
             id: data.id,
-            testIdCode: String(data.test_id || data.test_id_code || testIdCode).trim(),
-            testPassword: String(data.test_password || testPassword).trim(),
-            test_id: String(data.test_id || data.test_id_code || testIdCode).trim(),
-            test_password: String(data.test_password || testPassword).trim(),
+            testIdCode: String(data.test_id),
+            testPassword: String(data.test_password),
+            test_id: data.test_id,
+            test_password: data.test_password,
             createdAt: data.created_at || savedTest.createdAt
           };
-        } else if (error) {
-          console.warn('Supabase test insert warning, using local fallback:', error);
         }
       } catch (err) {
-        console.warn('Supabase create test error, continuing with local:', err);
+        console.error('Supabase create test error:', err);
+        throw err;
       }
     }
 
@@ -835,17 +860,17 @@ export const dbService = {
       return {
         id: qId,
         test_id: cleanTestId,
-        question_text: q.questionText,
-        has_code: Boolean(q.hasCode),
-        code_content: q.hasCode ? (q.codeContent || '') : null,
-        code_language: q.codeLanguage || 'c',
-        option_a: q.optionA,
-        option_b: q.optionB,
-        option_c: q.optionC || '',
-        option_d: q.optionD || '',
-        correct_option: q.correctOption || 'A',
+        question_text: String(q.questionText || q.question_text || 'Assessment Question').trim(),
+        has_code: Boolean(q.hasCode || q.has_code),
+        code_content: (q.hasCode || q.has_code) ? String(q.codeContent || q.code_content || '') : null,
+        code_language: String(q.codeLanguage || q.code_language || 'c').trim(),
+        option_a: String(q.optionA || q.option_a || 'Option A').trim(),
+        option_b: String(q.optionB || q.option_b || 'Option B').trim(),
+        option_c: String(q.optionC || q.option_c || 'Option C').trim(),
+        option_d: String(q.optionD || q.option_d || 'Option D').trim(),
+        correct_option: String(q.correctOption || q.correct_option || 'A').trim().toUpperCase().slice(0, 5),
         marks: Number(q.marks) || 2,
-        explanation: q.explanation || ''
+        explanation: String(q.explanation || '').trim()
       };
     });
 
@@ -857,14 +882,19 @@ export const dbService = {
         const chunkSize = 25;
         for (let i = 0; i < formattedPayloads.length; i += chunkSize) {
           const chunk = formattedPayloads.slice(i, i + chunkSize);
-          await supabase.from('questions').insert(chunk);
+          const { error } = await supabase.from('questions').insert(chunk);
+          if (error) {
+            console.error('Supabase bulk question insert error:', error);
+            throw new Error(`Failed to save questions to database: ${error.message}`);
+          }
           if (onProgress) {
             const currentPct = 30 + Math.round(((i + chunk.length) / formattedPayloads.length) * 60);
             onProgress(Math.min(currentPct, 90));
           }
         }
       } catch (err) {
-        console.warn('Supabase bulk question insert error, saving locally:', err);
+        console.error('Supabase bulk question insert error:', err);
+        throw err;
       }
     }
 
@@ -977,8 +1007,22 @@ export const dbService = {
 
     if (supabase) {
       try {
+        let targetUuid = cleanTestId;
+        if (cleanTestId && !isUUID(cleanTestId)) {
+          let testLookup = supabase.from('tests').select('id');
+          if (/^\d+$/.test(cleanTestId)) {
+            testLookup = testLookup.eq('test_id', parseInt(cleanTestId, 10));
+          } else {
+            testLookup = testLookup.eq('test_id', cleanTestId);
+          }
+          const { data: testRow } = await testLookup.maybeSingle();
+          if (testRow && testRow.id) {
+            targetUuid = testRow.id;
+          }
+        }
+
         let query = supabase.from('questions').select('*');
-        if (cleanTestId) query = query.eq('test_id', cleanTestId);
+        if (targetUuid && isUUID(targetUuid)) query = query.eq('test_id', targetUuid);
 
         const { data, error } = await withTimeout(query, 3500);
         if (!error && data && data.length > 0) {
