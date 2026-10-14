@@ -17,28 +17,26 @@ const DIRECT_SUPABASE_URL = 'https://fxgyxtdwzcgkajrvdgro.supabase.co';
 const getStoredCredentials = () => {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || DIRECT_SUPABASE_URL;
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || getDefaultKey();
-  const localUrl = localStorage.getItem('infoyashonand_supabase_url');
-  const localKey = localStorage.getItem('infoyashonand_supabase_key');
+  const localUrl = typeof window !== 'undefined' ? localStorage.getItem('infoyashonand_supabase_url') : null;
+  const localKey = typeof window !== 'undefined' ? localStorage.getItem('infoyashonand_supabase_key') : null;
 
-  let supabaseUrl = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || DIRECT_SUPABASE_URL;
+  // Clean stale direct supabase.co URL from localStorage if present
+  if (localUrl && localUrl.includes('supabase.co')) {
+    try {
+      localStorage.removeItem('infoyashonand_supabase_url');
+    } catch (e) { }
+  }
+
   const supabaseKey = (localKey && localKey.trim()) || (envKey && envKey.trim()) || getDefaultKey();
 
-  // In local development server, route through proxy (/supabase-api) to bypass local ISP DNS
-  if (
-    typeof window !== 'undefined' &&
-    window.location &&
-    (window.location.hostname === '127.0.0.1' ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname.startsWith('192.168.') ||
-      window.location.hostname.startsWith('10.') ||
-      window.location.hostname.startsWith('172.') ||
-      window.location.port === '5174' ||
-      window.location.port === '5175')
-  ) {
+  // In all browser environments (Vite dev server, Vercel, mobile phone browsers),
+  // ALWAYS route through same-origin proxy (/supabase-api).
+  // This bypasses regional ISP DNS blocks (NXDOMAIN) on *.supabase.co and avoids CORS issues.
+  let supabaseUrl = '';
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
     supabaseUrl = `${window.location.origin}/supabase-api`;
   } else {
-    // On Vercel and production deployments, connect directly to Supabase cloud
-    supabaseUrl = DIRECT_SUPABASE_URL;
+    supabaseUrl = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || DIRECT_SUPABASE_URL;
   }
 
   return { supabaseUrl, supabaseKey };

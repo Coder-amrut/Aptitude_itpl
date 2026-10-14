@@ -290,6 +290,8 @@ export const dbService = {
 
       // 1. Fetch active tests from database to match Test ID / Code
       let matchedTest = null;
+      let networkError = null;
+
       if (supabase) {
         try {
           let testQuery = supabase.from('tests').select('*, questions(count)');
@@ -306,6 +308,10 @@ export const dbService = {
             8000
           );
 
+          if (matchErr) {
+            networkError = matchErr.message || String(matchErr);
+          }
+
           // If relation query failed or returned empty, do a direct clean select('*')
           if ((matchErr || !dbMatches || dbMatches.length === 0) && /^\d+$/.test(cleanCode)) {
             try {
@@ -316,8 +322,13 @@ export const dbService = {
               if (directRes && directRes.data && directRes.data.length > 0) {
                 dbMatches = directRes.data;
                 matchErr = null;
+                networkError = null;
+              } else if (directRes && directRes.error) {
+                networkError = directRes.error.message || String(directRes.error);
               }
-            } catch (dirErr) { }
+            } catch (dirErr) {
+              networkError = dirErr.message || String(dirErr);
+            }
           }
 
           if (!matchErr && dbMatches && dbMatches.length > 0) {
@@ -340,29 +351,40 @@ export const dbService = {
           }
         } catch (e) {
           console.warn('Direct test_id query error:', e);
+          networkError = e.message || String(e);
         }
       }
 
       if (!matchedTest) {
-        const allTests = await this.getTests();
+        try {
+          const allTests = await this.getTests();
 
-        matchedTest = allTests.find((t) => {
-          const normalizedCode = String(
-            t.testIdCode ?? t.test_id ?? ""
-          ).trim().toLowerCase();
+          matchedTest = allTests.find((t) => {
+            const normalizedCode = String(
+              t.testIdCode ?? t.test_id ?? ""
+            ).trim().toLowerCase();
 
-          const normalizedId = String(t.id ?? "")
-            .trim()
-            .toLowerCase();
+            const normalizedId = String(t.id ?? "")
+              .trim()
+              .toLowerCase();
 
-          return (
-            (normalizedCode !== "" && normalizedCode === cleanCode.toLowerCase()) ||
-            (normalizedId !== "" && normalizedId === cleanCode.toLowerCase())
-          );
-        });
+            return (
+              (normalizedCode !== "" && normalizedCode === cleanCode.toLowerCase()) ||
+              (normalizedId !== "" && normalizedId === cleanCode.toLowerCase())
+            );
+          });
+        } catch (e) {
+          if (!networkError) networkError = e.message || String(e);
+        }
       }
 
       if (!matchedTest) {
+        if (networkError && (networkError.includes('fetch') || networkError.includes('Network') || networkError.includes('timeout') || networkError.includes('abort'))) {
+          return {
+            success: false,
+            message: `Assessment database connection error (${networkError}). Please check your internet connection or reload the portal.`
+          };
+        }
         return {
           success: false,
           message: `Test ID "${cleanCode}" was not found in the database. Please verify the Test ID provided by the Administrator.`
