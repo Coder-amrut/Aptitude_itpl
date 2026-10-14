@@ -292,11 +292,17 @@ export const dbService = {
       let matchedTest = null;
       if (supabase) {
         try {
+          let testQuery = supabase.from('tests').select('*, questions(count)');
+          if (/^\d+$/.test(cleanCode)) {
+            testQuery = testQuery.eq('test_id', parseInt(cleanCode, 10));
+          } else if (isUUID(cleanCode)) {
+            testQuery = testQuery.eq('id', cleanCode);
+          } else {
+            testQuery = testQuery.ilike('title', `%${cleanCode}%`);
+          }
+
           const { data: dbMatches, error: matchErr } = await withTimeout(
-            supabase
-              .from('tests')
-              .select('*, questions(count)')
-              .ilike('test_id', cleanCode),
+            testQuery,
             2800
           );
 

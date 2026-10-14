@@ -10,14 +10,18 @@ const getStoredCredentials = () => {
   let supabaseUrl = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || '';
   const supabaseKey = (localKey && localKey.trim()) || (envKey && envKey.trim()) || '';
 
-  // In browser local development, route through Vite proxy (/supabase-api)
-  // to avoid Origin-based secret key restriction and ISP DNS resolution failure
+  // Route through proxy (/supabase-api) on any browser/device (phone, tablet, PC)
+  // to prevent Origin secret key rejection, CORS blocks, and ISP DNS failures
   if (
     typeof window !== 'undefined' &&
     window.location &&
-    (window.location.hostname === '127.0.0.1' ||
+    (import.meta.env.DEV ||
+      window.location.hostname === '127.0.0.1' ||
       window.location.hostname === 'localhost' ||
-      window.location.port === '5174')
+      window.location.hostname.startsWith('192.168.') ||
+      window.location.hostname.startsWith('10.') ||
+      window.location.hostname.startsWith('172.') ||
+      window.location.port !== '')
   ) {
     supabaseUrl = `${window.location.origin}/supabase-api`;
   }

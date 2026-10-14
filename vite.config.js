@@ -21,7 +21,7 @@ const agent = new https.Agent({
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '127.0.0.1',
+    host: '0.0.0.0',
     port: 5174,
     proxy: {
       '/supabase-api': {
