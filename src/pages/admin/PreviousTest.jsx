@@ -224,7 +224,7 @@ export const PreviousTest = ({ onSelectTestResults }) => {
                           PASSWORD
                         </div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#059669', fontSize: '0.85rem' }}>
-                          {test.testPassword || 'Exam@Pass2026'}
+                          {test.testPassword || '—'}
                         </div>
                       </div>
                     </div>
@@ -232,9 +232,9 @@ export const PreviousTest = ({ onSelectTestResults }) => {
                     <button
                       type="button"
                       onClick={() => {
-                        const info = `Assessment: ${test.title}\nTest ID: ${test.testIdCode || `TEST-${test.id.slice(0, 6).toUpperCase()}`}\nPassword: ${test.testPassword || 'Exam@Pass2026'}`;
+                        const info = `Assessment: ${test.title}\nTest ID: ${test.testIdCode || `TEST-${test.id.slice(0, 6).toUpperCase()}`}\nPassword: ${test.testPassword || ''}`;
                         navigator.clipboard.writeText(info);
-                        alert(`Copied Credentials for "${test.title}":\nTest ID: ${test.testIdCode || `TEST-${test.id.slice(0, 6).toUpperCase()}`}\nPassword: ${test.testPassword || 'Exam@Pass2026'}`);
+                        alert(`Copied Credentials for "${test.title}":\nTest ID: ${test.testIdCode || `TEST-${test.id.slice(0, 6).toUpperCase()}`}\nPassword: ${test.testPassword || ''}`);
                       }}
                       className="btn btn-secondary btn-sm"
                       style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem', background: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}

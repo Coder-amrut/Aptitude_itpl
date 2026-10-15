@@ -338,7 +338,7 @@ export const dbService = {
               title: t.title,
               category: t.category,
               testIdCode: String(t.test_id || t.test_id_code || cleanCode).trim(),
-              testPassword: String(t.test_password || 'Exam@Pass2026').trim(),
+              testPassword: String(t.test_password || t.testPassword || '').trim(),
               durationMinutes: Number(t.duration_minutes) || 30,
               totalMarks: Number(t.total_marks) || 20,
               passPercentage: Number(t.pass_percentage) || 50,
@@ -673,7 +673,7 @@ export const dbService = {
           return list.map((t) => ({
             ...t,
             testIdCode: String(t.testIdCode || t.test_id || (t.id ? `TEST-${t.id.slice(0, 6).toUpperCase()}` : 'TEST-01')).trim(),
-            testPassword: String(t.testPassword || t.test_password || 'Exam@Pass2026').trim(),
+            testPassword: String(t.testPassword || t.test_password || '').trim(),
             isActive: t.isActive !== false
           }));
         }
@@ -743,7 +743,7 @@ export const dbService = {
       if (!error && Array.isArray(data)) {
         const mapped = data.map((t) => {
           const testIdCode = String(t.test_id || t.test_id_code || (t.id ? `TEST-${t.id.slice(0, 6).toUpperCase()}` : 'TEST-01')).trim();
-          const testPassword = String(t.test_password || 'Exam@Pass2026').trim();
+          const testPassword = String(t.test_password || t.testPassword || '').trim();
 
           return {
             id: t.id,

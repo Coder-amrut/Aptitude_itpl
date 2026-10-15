@@ -28,6 +28,37 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [formUnlocked, setFormUnlocked] = useState(false);
+
+  // Strictly prevent browser credential managers (Chrome / Edge) from autofilling saved passwords on load
+  useEffect(() => {
+    setFormUnlocked(false);
+    setStudentName('');
+    setStudentPrn('');
+    setTestIdCode('');
+    setExamPassword('');
+    setAdminId('');
+    setAdminPassword('');
+    setErrorMessage('');
+
+    // Keep inputs readOnly for initial DOM evaluation to deter autofill heuristics
+    const unlockTimer = setTimeout(() => {
+      setFormUnlocked(true);
+    }, 250);
+
+    // Secondary cleanup in case the browser forcibly populated DOM values after mount
+    const sanitizeTimer = setTimeout(() => {
+      setTestIdCode('');
+      setExamPassword('');
+      setAdminId('');
+      setAdminPassword('');
+    }, 500);
+
+    return () => {
+      clearTimeout(unlockTimer);
+      clearTimeout(sanitizeTimer);
+    };
+  }, [activeTab]);
 
   // Auto-save candidate name and PRN to database when entered
   const handleNameBlur = async () => {
@@ -263,6 +294,12 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
         {/* ======================================================= */}
         {activeTab === 'student' && (
           <form onSubmit={handleStudentSubmit} autoComplete="off">
+            {/* Decoy fields to trap aggressive browser credential managers */}
+            <div style={{ position: 'absolute', opacity: 0, height: 0, width: 0, overflow: 'hidden', zIndex: -1 }} aria-hidden="true">
+              <input type="text" name="fake_cand_user_prevent" tabIndex={-1} autoComplete="off" />
+              <input type="password" name="fake_cand_pass_prevent" tabIndex={-1} autoComplete="new-password" />
+            </div>
+
             {/* 1. OPTION 1: STUDENT NAME */}
             <div className="form-group" style={{ marginBottom: '1rem' }}>
               <label
@@ -289,6 +326,9 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck="false"
+                  readOnly={!formUnlocked}
+                  onFocus={(e) => { e.target.readOnly = false; }}
+                  name="cand_full_name_field"
                 />
               </div>
             </div>
@@ -319,6 +359,9 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck="false"
+                  readOnly={!formUnlocked}
+                  onFocus={(e) => { e.target.readOnly = false; }}
+                  name="cand_prn_num_field"
                 />
               </div>
             </div>
@@ -348,6 +391,11 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck="false"
+                  readOnly={!formUnlocked}
+                  onFocus={(e) => { e.target.readOnly = false; }}
+                  data-lpignore="true"
+                  name="assessment_tid_unq"
+                  id="assessment_tid_unq"
                 />
               </div>
             </div>
@@ -374,12 +422,15 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
                   value={examPassword}
                   onChange={(e) => setExamPassword(e.target.value)}
                   placeholder="Enter Test Password"
-                  autoComplete="off"
+                  autoComplete="new-password"
                   autoCorrect="off"
                   spellCheck="false"
                   data-lpignore="true"
                   data-form-type="other"
-                  name="exam_password_input"
+                  readOnly={!formUnlocked}
+                  onFocus={(e) => { e.target.readOnly = false; }}
+                  name="assessment_tpass_unq"
+                  id="assessment_tpass_unq"
                 />
                 <button
                   type="button"
@@ -463,7 +514,13 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
         {/* TAB 2: PLACEMENT ADMIN LOGIN (ADMIN ID + PASSWORD)      */}
         {/* ======================================================= */}
         {activeTab === 'admin' && (
-          <form onSubmit={handleAdminSubmit}>
+          <form onSubmit={handleAdminSubmit} autoComplete="off">
+            {/* Decoy fields to trap aggressive browser credential managers */}
+            <div style={{ position: 'absolute', opacity: 0, height: 0, width: 0, overflow: 'hidden', zIndex: -1 }} aria-hidden="true">
+              <input type="text" name="fake_admin_user_prevent" tabIndex={-1} autoComplete="off" />
+              <input type="password" name="fake_admin_pass_prevent" tabIndex={-1} autoComplete="new-password" />
+            </div>
+
             {/* Admin ID input */}
             <div className="form-group" style={{ marginBottom: '1.1rem' }}>
               <label
@@ -489,6 +546,11 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck="false"
+                  readOnly={!formUnlocked}
+                  onFocus={(e) => { e.target.readOnly = false; }}
+                  data-lpignore="true"
+                  name="admin_login_uid_field"
+                  id="admin_login_uid_field"
                 />
               </div>
             </div>
@@ -515,12 +577,15 @@ export const AdminLogin = ({ onAdminLoginSuccess, onStudentLoginSuccess }) => {
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
                   placeholder="Enter Admin Password"
-                  autoComplete="off"
+                  autoComplete="new-password"
                   autoCorrect="off"
                   spellCheck="false"
                   data-lpignore="true"
                   data-form-type="other"
-                  name="admin_password_input"
+                  readOnly={!formUnlocked}
+                  onFocus={(e) => { e.target.readOnly = false; }}
+                  name="admin_login_pwd_field"
+                  id="admin_login_pwd_field"
                 />
                 <button
                   type="button"
